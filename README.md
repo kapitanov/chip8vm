@@ -53,3 +53,7 @@ Some helpful resources I've used when writing this:
 - [multigesture.net/articles/how-to-write-an-emulator-chip-8-interpreter](http://www.multigesture.net/articles/how-to-write-an-emulator-chip-8-interpreter/)
 - [github.com/JamesGriffin/CHIP-8-Emulator](https://github.com/JamesGriffin/CHIP-8-Emulator)
 - [wikipedia.org/wiki/CHIP-8](https://en.wikipedia.org/wiki/CHIP-8)
+
+## License
+
+The source code of this project is licensed under [the MIT license](LICENSE).
