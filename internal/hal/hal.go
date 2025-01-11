@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"time"
 	"unsafe"
 
@@ -14,6 +15,10 @@ import (
 const (
 	WindowWidth  = 1024
 	WindowHeight = 512
+
+	AudioFrequency = 16000
+	AudioToneHZ    = 440.0
+	AudioDuration  = 0.25
 )
 
 type HAL struct {
@@ -22,6 +27,7 @@ type HAL struct {
 	texture         *sdl.Texture
 	backBuffer      []uint32
 	backBufferPitch int
+	audio           sdl.AudioDeviceID
 }
 
 var (
@@ -34,11 +40,10 @@ func New() (*HAL, error) {
 		return nil, fmt.Errorf("failed to init sdl: %w", err)
 	}
 
-	window, err := sdl.CreateWindow("CHIP-8", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, WindowWidth, WindowHeight, sdl.WINDOW_SHOWN|sdl.WINDOW_UTILITY)
+	window, err := sdl.CreateWindow("CHIP-8", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, WindowWidth, WindowHeight, sdl.WINDOW_SHOWN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sdl window: %w", err)
 	}
-	slog.Debug("hal: create window")
 	window.Show()
 
 	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED)
@@ -49,13 +54,22 @@ func New() (*HAL, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to resize sdl renderer: %w", err)
 	}
-	slog.Debug("hal: create renderer")
 
 	texture, err := renderer.CreateTexture(sdl.PIXELFORMAT_ARGB8888, sdl.TEXTUREACCESS_STREAMING, vm.ScreenWidth, vm.ScreenHeight)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sdl texture: %w", err)
 	}
-	slog.Debug("hal: create texture")
+
+	audioSpec := &sdl.AudioSpec{
+		Freq:     AudioFrequency,
+		Format:   sdl.AUDIO_S16SYS,
+		Channels: 1,
+		Samples:  1024,
+	}
+	audio, err := sdl.OpenAudioDevice("", false, audioSpec, nil, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open audio device: %w", err)
+	}
 
 	return &HAL{
 		window:          window,
@@ -63,6 +77,7 @@ func New() (*HAL, error) {
 		texture:         texture,
 		backBuffer:      make([]uint32, vm.ScreenWidth*vm.ScreenHeight),
 		backBufferPitch: int(vm.ScreenWidth) * int(unsafe.Sizeof(uint32(0))),
+		audio:           audio,
 	}, nil
 }
 
@@ -203,7 +218,34 @@ func (hal *HAL) Draw(gfx []uint8) error {
 	}
 
 	hal.renderer.Present()
-	hal.window.SetAlwaysOnTop(true)
+	return nil
+}
+
+func (hal *HAL) Beep() error {
+	const (
+		sampleCount = int(AudioDuration * AudioFrequency)
+		gain        = float64(math.MaxInt16)
+	)
+
+	timeStep := 1.0 / float64(sampleCount)
+
+	t := 0.0
+	var sample int16
+	sampleSize := int(unsafe.Sizeof(sample))
+	samples := make([]byte, sampleCount*sampleSize)
+
+	for i := 0; i < sampleCount; i++ {
+		t += timeStep
+		sample := int16(math.Sin(2*math.Pi*AudioToneHZ*t) * gain)
+		samples[2*i+0] = byte(sample >> 8)
+		samples[2*i+1] = byte(sample & 0xFF)
+	}
+
+	if err := sdl.QueueAudio(hal.audio, samples); err != nil {
+		return fmt.Errorf("failed to queue audio: %w", err)
+	}
+
+	sdl.PauseAudioDevice(hal.audio, false)
 	return nil
 }
 

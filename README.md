@@ -8,10 +8,6 @@ Written in Go and SDL.
 > and was initally used on the COSMAC VIP and Telmac 1800 8-bit microcomputers to make game programming easier.
 > CHIP-8 programs are run using a CHIP-8 virtual machine.
 
-## Limitations
-
-This emulator doesn't support audio so far.
-
 ## Compiling and Running
 
 Requires make and Golang:

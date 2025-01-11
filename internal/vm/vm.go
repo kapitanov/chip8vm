@@ -52,6 +52,7 @@ func New(program []byte) *VM {
 type HAL interface {
 	ReadInput(keyDown func(Key), keyUp func(Key)) error
 	Draw(gfx []byte) error
+	Beep() error
 	WaitForNextFrame() error
 	WaitForQuit() error
 }
@@ -106,7 +107,7 @@ func (vm *VM) waitForReboot(hal HAL) error {
 }
 
 func (vm *VM) runStep(hal HAL) error {
-	if err := vm.step(); err != nil {
+	if err := vm.step(hal); err != nil {
 		return err
 	}
 
@@ -182,7 +183,7 @@ func (vm *VM) keyUp(key Key) {
 	vm.keypad[int(key)] = 0
 }
 
-func (vm *VM) step() error {
+func (vm *VM) step(hal HAL) error {
 	if err := vm.executeOpcode(vm.fetchOpcode()); err != nil {
 		return err
 	}
@@ -194,7 +195,9 @@ func (vm *VM) step() error {
 
 	if vm.soundTimer > 0 {
 		if vm.soundTimer == 1 {
-			// TODO: Implement sound
+			if err := hal.Beep(); err != nil {
+				return err
+			}
 		}
 		vm.soundTimer--
 	}
